@@ -1,0 +1,4 @@
+1、demo_window_simple_playback.html、demo_window_simple_preview.html为简化版demo，可在此基础上开发；
+2、demo_window_integration.html为包含了所有功能的demo，可参照此demo来开发、验证功能、排查问题；
+3、demo_for_iframe.html、demo_embedded_for_iframe.html为iframe对接场景demo，前者嵌入了后者。验证iframe对接需要运行webs.exe模拟WEB服务，或将这两个文件放到WEB服务器中，通过IP:PORT的方式访问；如http:127.0.0.1:80/demo_for_iframe.html。
+4、其它js文件为demo依赖文件；

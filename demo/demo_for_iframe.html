@@ -1,0 +1,178 @@
+<!doctype html>
+<html>
+<head>
+    <title>Window Demo</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
+    <meta http-equiv="Expires" content="0" />
+</head>
+<style>
+html, body {
+    padding: 0;
+    margin: 0;
+}
+.iframe {
+    margin: 100px;
+    border: 1px solid blue;
+}
+</style>
+<body>
+	 <!-- 步骤1：src指定待嵌入的子页面，scrolling指定no禁用滚动条 -->
+    <iframe id="iframe1" class="iframe" src="http://127.0.0.1/demo_embedded_for_iframe.html" scrolling="no" frameborder="0" width="900" height="750"></iframe>
+</body>
+<script src="jquery-1.12.4.min.js"></script>
+<script src="jsencrypt.min.js"></script>
+<script src="jsWebControl-1.0.0.min.js"></script>
+<!-- <script src="JsonToXml.js"></script>
+<script src="jsWebControl-Bridge.js"></script> -->
+<script type="text/javascript">	
+	// 步骤2：嵌入子页面的页面中在iframe的onload事件中向子页面抛以下消息
+	var iframeWin = document.getElementById("iframe1");
+	{
+		iframeWin.onload = function(){
+		iframeWin.contentWindow.postMessage({
+							  action:'sendTitle',   // 告诉子页面本页面的标题（action自行指定，但需要与子页面中监听的action保持一致
+							  msg: '将标题发给子页面',
+							  info: document.title
+							}, '\*');
+		iframeWin.contentWindow.postMessage({
+							  action:'updateInitParam',    // 告诉子页面一些初始值，包括浏览器视窗高度与宽度、iframe偏离文档的位置、iframe相对视窗的位置
+							  msg: '更新子页面一些初始值',
+							  showSize: {                       // 浏览器视窗高度与宽度
+									width: $(window).width(),  
+									height: $(window).height()  
+								},
+							  iframeOffset: {                   // iframe偏离文档的位置
+									left: iframeWin.offsetLeft,  
+									top: iframeWin.offsetTop     
+								  },
+							  iframeClientPos: {	            // iframe相对视窗的位置
+									left: iframeWin.getBoundingClientRect().left,
+									right: iframeWin.getBoundingClientRect().right,
+									top: iframeWin.getBoundingClientRect().top,
+									bottom: iframeWin.getBoundingClientRect().bottom
+								}
+							}, '\*');   // '\*'表示跨域参数，请结合自身业务合理设置
+		}
+	}	
+	
+	// 步骤3：监听嵌入子页面的事件
+	window.addEventListener('message', function(e){
+		console.log(e.data.msg);
+		if(e && e.data){
+			switch (e.data.action){
+				case 'updateTitle':        // 本页面收到子页面通知更新标题通知，更新本页面标题
+					document.title = e.data.info;
+					break;
+				case 'updatePos':
+					var scrollLeftValue = document.documentElement.scrollLeft;
+					var scrollTopValue = document.documentElement.scrollTop;
+					iframeWin.contentWindow.postMessage({
+							  action:'updatePos',  
+							  msg: '更新Pos',
+							  scrollValue: {          // 滚动条滚动的偏移量
+									left: -1 * scrollLeftValue,
+									top: -1 * scrollTopValue,									
+								  }
+							}, '\*');   // '\*'表示跨域参数，请结合自身业务合理设置
+					break;
+				default:
+					break;
+			}
+		}
+	});	
+	
+	// 步骤4：兼听本页面的resize事件，并将一些状态值发送给嵌入的子页面
+	var resizeTimer = null;
+	var resizeDate;
+	$(window).resize(function () {
+		resizeDate = new Date();
+		if (resizeTimer === null){
+			resizeTimer = setTimeout(checkResizeEndTimer, 100);
+		}
+	});
+	
+	function checkResizeEndTimer(){
+		if (new Date() - resizeDate > 100){  // resize结束后再发消息，避免残影问题
+			clearTimeout(resizeTimer);
+			resizeTimer = null;
+			postResizeEvent();
+		} else{
+			setTimeout(checkResizeEndTimer, 100);
+		}
+	}
+	
+	function postResizeEvent(){
+		iframeWin.contentWindow.postMessage({
+					action: 'resize',       
+					msg: 'resize事件',
+					showSize: {             // 告诉嵌入的子页面视窗高度与宽度
+						width: $(window).width(),   
+						height: $(window).height()  
+					},
+					iframeClientPos: {	    // iframe相对视窗的位置
+						left: iframeWin.getBoundingClientRect().left,
+						right: iframeWin.getBoundingClientRect().right,
+						top: iframeWin.getBoundingClientRect().top,
+						bottom: iframeWin.getBoundingClientRect().bottom
+					},
+					iframeOffset: {        // iframe偏离文档的位置
+						left: iframeWin.offsetLeft,
+						top: iframeWin.offsetTop									
+					  }
+				}, '\*');     // '\*'表示跨域参数，请结合自身业务合理设置
+	}
+
+	// 步骤5：兼听本页面的scroll事件，并将一些状态值发送给嵌入的子页面
+	// 为性能考虑，可以在定时器中处理
+	var scrollTimer = null;
+	var scrollDate;
+	$(window).scroll(function (event) {
+		postScrollEvent();
+		scrollDate = new Date();
+		if (scrollTimer === null){
+			scrollTimer = setTimeout(checkScrollEndTimer, 100);
+		}		
+    });	
+	
+	function checkScrollEndTimer(){
+		if (new Date() - scrollDate > 100){  // resize结束后再发消息，避免残影问题
+			clearTimeout(scrollTimer);
+			scrollTimer = null;			
+		} else{
+			postScrollEvent();
+			setTimeout(checkScrollEndTimer, 100);
+		}
+	}
+	
+	function postScrollEvent(){
+		// 计算滚动条偏移量
+		var scrollLeftValue = document.documentElement.scrollLeft;
+		var scrollTopValue = document.documentElement.scrollTop;
+		iframeWin.contentWindow.postMessage({
+			  action:'scroll',        
+			  msg: 'scroll事件',	 						  
+			  scrollValue: {          // 滚动条滚动的偏移量
+					left: -1 * scrollLeftValue,
+					top: -1 * scrollTopValue,									
+				  },
+				iframeClientPos: {	  // iframe相对视窗的位置
+					left: iframeWin.getBoundingClientRect().left,
+					right: iframeWin.getBoundingClientRect().right,
+					top: iframeWin.getBoundingClientRect().top,
+					bottom: iframeWin.getBoundingClientRect().bottom
+				},
+				showSize: {          // 告诉嵌入的子页面视窗高度与宽度
+					width: $(window).width(),    // 视窗宽度
+					height: $(window).height()  // 视窗高度
+				},
+				iframeOffset: {      // iframe偏离文档的位置
+					left: iframeWin.offsetLeft,
+					top: iframeWin.offsetTop									
+				  }
+			}, '\*');	   // '\*'表示跨域参数，请结合自身业务合理设置
+	}
+	
+</script>
+</html>
